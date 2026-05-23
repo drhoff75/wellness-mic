@@ -203,12 +203,12 @@
     if (SpeechRecognition) {
       recognition = new SpeechRecognition();
       recognition.lang = 'en-US';
-      recognition.continuous = false;
+      recognition.continuous = true;
       recognition.interimResults = true;
 
       recognition.onresult = function(event) {
         var transcript = '';
-        for (var i = event.resultIndex; i < event.results.length; i++) {
+        for (var i = 0; i < event.results.length; i++) {
           transcript += event.results[i][0].transcript;
         }
         var el = document.getElementById('transcript');
@@ -218,12 +218,17 @@
       };
 
       recognition.onerror = function(event) {
-        setStatus('Error: ' + event.error, 'error');
+        if (event.error !== 'no-speech') {
+          setStatus('Error: ' + event.error, 'error');
+        }
         stopMic();
       };
 
       recognition.onend = function() {
-        stopMic();
+        // In continuous mode, restart if still recording (browser may stop after silence)
+        if (isRecording) {
+          try { recognition.start(); } catch(e) { stopMic(); }
+        }
       };
     } else {
       document.getElementById('mic-btn').style.display = 'none';
@@ -262,7 +267,7 @@
           try { recognition.stop(); } catch(e) {}
           stopMic();
         }
-      }, 15000);
+      }, 60000);
     }
 
     function stopMic() {
