@@ -288,7 +288,8 @@
       setStatus('<span class="spinner"></span> Sending to AI...', 'processing');
 
       // Call the Apps Script backend using JSONP-style redirect
-      var url = GAS_URL + '?action=voice&text=' + encodeURIComponent(text) + '&meal=' + encodeURIComponent(currentMeal);
+      var deviceType = /Mobi|Android/i.test(navigator.userAgent) ? 'mobile' : 'desktop';
+      var url = GAS_URL + '?action=voice&text=' + encodeURIComponent(text) + '&meal=' + encodeURIComponent(currentMeal) + '&device=' + deviceType;
 
       fetch(url, { redirect: 'follow', mode: 'cors' })
         .then(function(r) { return r.text(); })
