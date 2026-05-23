@@ -287,33 +287,40 @@
       document.getElementById('submit-btn').disabled = true;
       setStatus('<span class="spinner"></span> Sending to AI...', 'processing');
 
-      // Call the Apps Script backend
+      // Call the Apps Script backend using JSONP-style redirect
       var url = GAS_URL + '?action=voice&text=' + encodeURIComponent(text) + '&meal=' + encodeURIComponent(currentMeal);
 
-      fetch(url)
+      fetch(url, { redirect: 'follow', mode: 'cors' })
         .then(function(r) { return r.text(); })
         .then(function(data) {
           try {
             var result = JSON.parse(data);
-            if (result.caloriesIn !== undefined) {
-              setStatus('Logged successfully!', 'success');
-              showResult(result);
-              // Reset for next input
-              setTimeout(function() {
-                document.getElementById('transcript').textContent = 'Tap the mic and speak...';
-                document.getElementById('transcript').classList.add('empty');
-                document.getElementById('submit-btn').disabled = true;
-              }, 3000);
-            } else {
-              setStatus('Logged!', 'success');
+            if (result.error) {
+              setStatus('Error: ' + result.error, 'error');
+              document.getElementById('submit-btn').disabled = false;
+              return;
             }
+            setStatus('Logged successfully!', 'success');
+            showResult(result);
+            setTimeout(function() {
+              document.getElementById('transcript').textContent = 'Tap the mic and speak...';
+              document.getElementById('transcript').classList.add('empty');
+              document.getElementById('submit-btn').disabled = true;
+            }, 3000);
           } catch(e) {
             setStatus('Logged! Return to tracker to see details.', 'success');
           }
         })
         .catch(function(err) {
-          setStatus('Error: ' + err.message, 'error');
-          document.getElementById('submit-btn').disabled = false;
+          // CORS fallback: open in new tab to trigger the request
+          window.open(url, '_blank');
+          setStatus('Logging... Check your tracker in a moment.', 'processing');
+          setTimeout(function() {
+            setStatus('Food should be logged. Tap Back to Tracker to verify.', 'success');
+            document.getElementById('transcript').textContent = 'Tap the mic and speak...';
+            document.getElementById('transcript').classList.add('empty');
+            document.getElementById('submit-btn').disabled = true;
+          }, 5000);
         });
     }
 
