@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Wellness Tracker - Voice Input</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f5f7fa;
+      color: #1a1a2e;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 20px;
+    }
+    .container {
+      background: white;
+      border-radius: 20px;
+      padding: 24px;
+      width: 100%;
+      max-width: 400px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+      text-align: center;
+    }
+    h1 { font-size: 20px; margin-bottom: 16px; color: #1a1a2e; }
+
+    .meal-selector {
+      display: flex;
+      gap: 4px;
+      margin-bottom: 16px;
+    }
+    .meal-btn {
+      flex: 1;
+      padding: 8px 2px;
+      border: 2px solid #e8ecf1;
+      border-radius: 8px;
+      background: white;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      color: #555;
+    }
+    .meal-btn.active { background: #3b82f6; border-color: #3b82f6; color: white; }
+
+    .mic-btn {
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      border: none;
+      background: #3b82f6;
+      color: white;
+      font-size: 32px;
+      cursor: pointer;
+      margin: 16px auto;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+    }
+    .mic-btn.recording {
+      background: #ef4444;
+      animation: pulse 1.5s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.1); }
+    }
+
+    .transcript {
+      min-height: 48px;
+      padding: 12px;
+      background: #f8f9fb;
+      border-radius: 10px;
+      margin: 12px 0;
+      font-size: 16px;
+      color: #333;
+      text-align: left;
+    }
+    .transcript.empty { color: #aaa; text-align: center; }
+
+    .status {
+      font-size: 13px;
+      min-height: 20px;
+      margin: 8px 0;
+    }
+    .status.processing { color: #3b82f6; }
+    .status.error { color: #ef4444; }
+    .status.success { color: #22c55e; }
+
+    .btn-submit {
+      width: 100%;
+      padding: 14px;
+      border: none;
+      border-radius: 10px;
+      background: #22c55e;
+      color: white;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 8px;
+    }
+    .btn-submit:hover { background: #16a34a; }
+    .btn-submit:disabled { background: #ccc; cursor: not-allowed; }
+
+    .btn-back {
+      display: inline-block;
+      margin-top: 16px;
+      color: #3b82f6;
+      text-decoration: none;
+      font-size: 14px;
+    }
+
+    .spinner {
+      display: inline-block;
+      width: 16px;
+      height: 16px;
+      border: 2px solid #e8ecf1;
+      border-top-color: #3b82f6;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .result-items {
+      text-align: left;
+      margin-top: 12px;
+    }
+    .result-item {
+      padding: 8px 10px;
+      background: #f0fdf4;
+      border-radius: 8px;
+      margin-bottom: 4px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 14px;
+    }
+    .result-item .cal { color: #22c55e; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Voice Input</h1>
+
+    <div class="meal-selector">
+      <button class="meal-btn active" onclick="selectMeal(this, 'Breakfast')">Breakfast</button>
+      <button class="meal-btn" onclick="selectMeal(this, 'Lunch')">Lunch</button>
+      <button class="meal-btn" onclick="selectMeal(this, 'Snack')">Snack</button>
+      <button class="meal-btn" onclick="selectMeal(this, 'Dinner')">Dinner</button>
+    </div>
+
+    <button class="mic-btn" id="mic-btn" onclick="toggleMic()">&#127908;</button>
+    <div style="font-size:12px;color:#888;">Tap to start / stop</div>
+
+    <div class="transcript empty" id="transcript">Tap the mic and speak...</div>
+
+    <div class="status" id="status"></div>
+
+    <button class="btn-submit" id="submit-btn" onclick="submitVoice()" disabled>Log Food</button>
+
+    <div id="result"></div>
+
+    <a class="btn-back" href="https://script.google.com/macros/s/AKfycbxQbfZzReuSn-amJWbroWaMH6TBWBDP0YvI3Es8a4UbyIhhj16gSERpY_lgk8S93DhwZA/exec">
+      &larr; Back to Tracker
+    </a>
+  </div>
+
+  <script>
+    var GAS_URL = 'https://script.google.com/macros/s/AKfycbxQbfZzReuSn-amJWbroWaMH6TBWBDP0YvI3Es8a4UbyIhhj16gSERpY_lgk8S93DhwZA/exec';
+    var currentMeal = 'Breakfast';
+    var isRecording = false;
+    var recognition = null;
+    var recordingTimeout = null;
+
+    // Auto-select meal based on time
+    (function() {
+      var hour = new Date().getHours();
+      var meal = 'Snack';
+      if (hour < 11) meal = 'Breakfast';
+      else if (hour < 15) meal = 'Lunch';
+      else if (hour >= 18) meal = 'Dinner';
+      document.querySelectorAll('.meal-btn').forEach(function(btn) {
+        if (btn.textContent === meal) {
+          btn.classList.add('active');
+          currentMeal = meal;
+        } else {
+          btn.classList.remove('active');
+        }
+      });
+    })();
+
+    function selectMeal(btn, meal) {
+      document.querySelectorAll('.meal-btn').forEach(function(b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+      currentMeal = meal;
+    }
+
+    // Init Speech Recognition
+    var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (SpeechRecognition) {
+      recognition = new SpeechRecognition();
+      recognition.lang = 'en-US';
+      recognition.continuous = false;
+      recognition.interimResults = true;
+
+      recognition.onresult = function(event) {
+        var transcript = '';
+        for (var i = event.resultIndex; i < event.results.length; i++) {
+          transcript += event.results[i][0].transcript;
+        }
+        var el = document.getElementById('transcript');
+        el.textContent = transcript;
+        el.classList.remove('empty');
+        document.getElementById('submit-btn').disabled = false;
+      };
+
+      recognition.onerror = function(event) {
+        setStatus('Error: ' + event.error, 'error');
+        stopMic();
+      };
+
+      recognition.onend = function() {
+        stopMic();
+      };
+    } else {
+      document.getElementById('mic-btn').style.display = 'none';
+      setStatus('Speech recognition not supported in this browser.', 'error');
+    }
+
+    function toggleMic() {
+      if (isRecording) {
+        try { recognition.stop(); } catch(e) {}
+        stopMic();
+      } else {
+        startMic();
+      }
+    }
+
+    function startMic() {
+      isRecording = true;
+      document.getElementById('transcript').textContent = '';
+      document.getElementById('transcript').classList.add('empty');
+      document.getElementById('result').innerHTML = '';
+      var btn = document.getElementById('mic-btn');
+      btn.classList.add('recording');
+      btn.innerHTML = '&#9724;';
+      setStatus('Listening... Tap to stop.', 'processing');
+
+      try {
+        recognition.start();
+      } catch(e) {
+        setStatus('Could not start mic: ' + e.message, 'error');
+        stopMic();
+        return;
+      }
+
+      recordingTimeout = setTimeout(function() {
+        if (isRecording) {
+          try { recognition.stop(); } catch(e) {}
+          stopMic();
+        }
+      }, 15000);
+    }
+
+    function stopMic() {
+      isRecording = false;
+      if (recordingTimeout) { clearTimeout(recordingTimeout); recordingTimeout = null; }
+      var btn = document.getElementById('mic-btn');
+      btn.classList.remove('recording');
+      btn.innerHTML = '&#127908;';
+
+      var text = document.getElementById('transcript').textContent.trim();
+      if (text && text !== 'Tap the mic and speak...') {
+        setStatus('Ready to log.', 'success');
+      } else {
+        setStatus('', '');
+      }
+    }
+
+    function submitVoice() {
+      var text = document.getElementById('transcript').textContent.trim();
+      if (!text || text === 'Tap the mic and speak...') return;
+
+      document.getElementById('submit-btn').disabled = true;
+      setStatus('<span class="spinner"></span> Sending to AI...', 'processing');
+
+      // Call the Apps Script backend
+      var url = GAS_URL + '?action=voice&text=' + encodeURIComponent(text) + '&meal=' + encodeURIComponent(currentMeal);
+
+      fetch(url)
+        .then(function(r) { return r.text(); })
+        .then(function(data) {
+          try {
+            var result = JSON.parse(data);
+            if (result.caloriesIn !== undefined) {
+              setStatus('Logged successfully!', 'success');
+              showResult(result);
+              // Reset for next input
+              setTimeout(function() {
+                document.getElementById('transcript').textContent = 'Tap the mic and speak...';
+                document.getElementById('transcript').classList.add('empty');
+                document.getElementById('submit-btn').disabled = true;
+              }, 3000);
+            } else {
+              setStatus('Logged!', 'success');
+            }
+          } catch(e) {
+            setStatus('Logged! Return to tracker to see details.', 'success');
+          }
+        })
+        .catch(function(err) {
+          setStatus('Error: ' + err.message, 'error');
+          document.getElementById('submit-btn').disabled = false;
+        });
+    }
+
+    function showResult(summary) {
+      var html = '<div class="result-items">';
+      if (summary.meals && summary.meals.length > 0) {
+        // Show last few items (the ones just added)
+        var recent = summary.meals.slice(-5);
+        recent.forEach(function(m) {
+          html += '<div class="result-item"><span>' + m.name + '</span><span class="cal">' + m.calories + ' kcal</span></div>';
+        });
+      }
+      html += '<div style="margin-top:8px;font-size:13px;color:#555;">Today: <strong>' + summary.caloriesIn + ' kcal</strong> eaten</div>';
+      html += '</div>';
+      document.getElementById('result').innerHTML = html;
+    }
+
+    function setStatus(msg, cls) {
+      var el = document.getElementById('status');
+      el.innerHTML = msg;
+      el.className = 'status' + (cls ? ' ' + cls : '');
+    }
+  </script>
+</body>
+</html>
