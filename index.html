@@ -174,6 +174,7 @@
     var isRecording = false;
     var recognition = null;
     var recordingTimeout = null;
+    var fullTranscript = '';
 
     // Auto-select meal based on time
     (function() {
@@ -207,12 +208,20 @@
       recognition.interimResults = true;
 
       recognition.onresult = function(event) {
-        var transcript = '';
-        for (var i = 0; i < event.results.length; i++) {
-          transcript += event.results[i][0].transcript;
+        var interimTranscript = '';
+        var finalTranscript = '';
+        for (var i = event.resultIndex; i < event.results.length; i++) {
+          if (event.results[i].isFinal) {
+            finalTranscript += event.results[i][0].transcript + ' ';
+          } else {
+            interimTranscript += event.results[i][0].transcript;
+          }
+        }
+        if (finalTranscript) {
+          fullTranscript += finalTranscript;
         }
         var el = document.getElementById('transcript');
-        el.textContent = transcript;
+        el.textContent = fullTranscript + interimTranscript;
         el.classList.remove('empty');
         document.getElementById('submit-btn').disabled = false;
       };
@@ -246,6 +255,7 @@
 
     function startMic() {
       isRecording = true;
+      fullTranscript = '';
       document.getElementById('transcript').textContent = '';
       document.getElementById('transcript').classList.add('empty');
       document.getElementById('result').innerHTML = '';
@@ -290,6 +300,11 @@
       if (!text || text === 'Tap the mic and speak...') return;
 
       document.getElementById('submit-btn').disabled = true;
+      // Stop mic if still recording
+      if (isRecording) {
+        try { recognition.stop(); } catch(e) {}
+        stopMic();
+      }
       setStatus('<span class="spinner"></span> Sending to AI...', 'processing');
 
       // Call the Apps Script backend using JSONP-style redirect
@@ -333,11 +348,15 @@
     function showResult(summary) {
       var html = '<div class="result-items">';
       if (summary.meals && summary.meals.length > 0) {
-        // Show last few items (the ones just added)
-        var recent = summary.meals.slice(-5);
-        recent.forEach(function(m) {
-          html += '<div class="result-item"><span>' + m.name + '</span><span class="cal">' + m.calories + ' kcal</span></div>';
-        });
+        // Show only the last logged item (most recent)
+        var lastItem = summary.meals[summary.meals.length - 1];
+        html += '<div class="result-item"><span><strong>' + lastItem.name + '</strong></span><span class="cal">' + lastItem.calories + ' kcal</span></div>';
+        // Show sub-items if grouped
+        if (lastItem.items && lastItem.items.length > 1) {
+          lastItem.items.forEach(function(sub) {
+            html += '<div class="result-item" style="font-size:12px;background:#f8faf8;"><span style="padding-left:8px;">' + sub.name + ' (' + sub.quantity + ')</span><span class="cal" style="font-size:12px;">' + sub.calories + ' kcal</span></div>';
+          });
+        }
       }
       html += '<div style="margin-top:8px;font-size:13px;color:#555;">Today: <strong>' + summary.caloriesIn + ' kcal</strong> eaten</div>';
       html += '</div>';
