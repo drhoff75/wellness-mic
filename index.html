@@ -8,26 +8,15 @@
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: #f5f7fa;
-      color: #1a1a2e;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      min-height: 100vh;
-      padding: 20px;
+      background: #f5f7fa; color: #1a1a2e;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      min-height: 100vh; padding: 20px;
     }
     .container {
-      background: white;
-      border-radius: 20px;
-      padding: 24px;
-      width: 100%;
-      max-width: 400px;
-      box-shadow: 0 2px 12px rgba(0,0,0,0.1);
-      text-align: center;
+      background: white; border-radius: 20px; padding: 24px;
+      width: 100%; max-width: 400px; box-shadow: 0 2px 12px rgba(0,0,0,0.1); text-align: center;
     }
     h1 { font-size: 20px; margin-bottom: 16px; color: #1a1a2e; }
-
     .meal-selector { display: flex; gap: 4px; margin-bottom: 16px; }
     .meal-btn {
       flex: 1; padding: 8px 2px; border: 2px solid #e8ecf1; border-radius: 8px;
@@ -43,37 +32,21 @@
     .mic-btn.recording { background: #ef4444; animation: pulse 1.5s infinite; }
     @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.1); } }
 
-    .transcript-area {
-      margin: 12px 0;
-      position: relative;
-    }
+    .timer { font-size: 14px; color: #888; margin-bottom: 8px; min-height: 20px; }
+
+    .transcript-area { margin: 12px 0; }
     .transcript-input {
-      width: 100%;
-      min-height: 48px;
-      padding: 12px;
-      background: #f8f9fb;
-      border: 2px solid #e8ecf1;
-      border-radius: 10px;
-      font-size: 16px;
-      color: #333;
-      text-align: left;
-      resize: vertical;
-      font-family: inherit;
-      outline: none;
+      width: 100%; min-height: 60px; padding: 12px;
+      background: #f8f9fb; border: 2px solid #e8ecf1; border-radius: 10px;
+      font-size: 16px; color: #333; text-align: left; resize: vertical;
+      font-family: inherit; outline: none;
     }
     .transcript-input:focus { border-color: #3b82f6; }
     .transcript-input::placeholder { color: #aaa; text-align: center; }
 
     .match-banner {
-      display: none;
-      padding: 8px 12px;
-      background: #f0fdf4;
-      border: 2px solid #22c55e;
-      border-radius: 8px;
-      margin: 8px 0;
-      text-align: left;
-      font-size: 14px;
-      cursor: pointer;
+      display: none; padding: 8px 12px; background: #f0fdf4; border: 2px solid #22c55e;
+      border-radius: 8px; margin: 8px 0; text-align: left; font-size: 14px; cursor: pointer;
     }
     .match-banner .match-name { font-weight: 600; }
     .match-banner .match-cal { color: #22c55e; font-weight: 600; float: right; }
@@ -124,13 +97,12 @@
     </div>
 
     <button class="mic-btn" id="mic-btn" onclick="toggleMic()">&#127908;</button>
-    <div style="font-size:12px;color:#888;">Tap to start / stop</div>
+    <div class="timer" id="timer">Tap to start recording (up to 30 sec)</div>
 
     <div class="transcript-area">
-      <textarea class="transcript-input" id="transcript" placeholder="Tap the mic and speak, or type here..." rows="2" oninput="onTranscriptChange()"></textarea>
+      <textarea class="transcript-input" id="transcript" placeholder="Your transcript will appear here. You can also type directly..." rows="3" oninput="onTranscriptChange()"></textarea>
     </div>
 
-    <!-- Known Food match banner -->
     <div class="match-banner" id="match-banner" onclick="useMatch()">
       <span class="match-name" id="match-name"></span>
       <span class="match-cal" id="match-cal"></span>
@@ -152,10 +124,14 @@
     var GAS_URL = 'https://script.google.com/macros/s/AKfycbxQbfZzReuSn-amJWbroWaMH6TBWBDP0YvI3Es8a4UbyIhhj16gSERpY_lgk8S93DhwZA/exec';
     var currentMeal = 'Breakfast';
     var isRecording = false;
-    var recognition = null;
-    var recordingTimeout = null;
+    var mediaRecorder = null;
+    var audioChunks = [];
+    var recordingTimer = null;
+    var secondsElapsed = 0;
+    var timerInterval = null;
     var knownFoods = [];
     var currentMatch = null;
+    var MAX_SECONDS = 30;
 
     // Auto-select meal based on time
     (function() {
@@ -174,7 +150,7 @@
       });
     })();
 
-    // Load Known Foods on page load for autocomplete matching
+    // Load Known Foods on page load
     (function() {
       fetch(GAS_URL + '?action=knownfoods', { redirect: 'follow', mode: 'cors' })
         .then(function(r) { return r.text(); })
@@ -190,101 +166,139 @@
       currentMeal = meal;
     }
 
-    // ---- Speech Recognition ----
-    var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (SpeechRecognition) {
-      recognition = new SpeechRecognition();
-      recognition.lang = 'en-US';
-      recognition.continuous = true;
-      recognition.interimResults = false;
-
-      var processedResults = 0;
-
-      recognition.onresult = function(event) {
-        // Only process NEW final results (skip already processed ones)
-        var newText = '';
-        for (var i = processedResults; i < event.results.length; i++) {
-          if (event.results[i].isFinal) {
-            newText += event.results[i][0].transcript + ' ';
-            processedResults = i + 1;
-          }
-        }
-        if (newText) {
-          var existing = document.getElementById('transcript').value.trim();
-          var fullText = existing ? existing + ' ' + newText.trim() : newText.trim();
-          document.getElementById('transcript').value = fullText;
-          document.getElementById('submit-btn').disabled = false;
-        }
-      };
-
-      recognition.onerror = function(event) {
-        if (event.error !== 'no-speech') {
-          setStatus('Error: ' + event.error, 'error');
-        }
-        stopMic();
-      };
-
-      recognition.onend = function() {
-        stopMic();
-        var text = document.getElementById('transcript').value.trim();
-        if (text) checkKnownFoodMatch(text);
-      };
-    } else {
-      document.getElementById('mic-btn').style.display = 'none';
-      setStatus('Speech recognition not supported in this browser.', 'error');
-    }
-
+    // ---- Audio Recording (MediaRecorder API) ----
     function toggleMic() {
       if (isRecording) {
-        try { recognition.stop(); } catch(e) {}
-        stopMic();
+        stopRecording();
       } else {
-        startMic();
+        startRecording();
       }
     }
 
-    function startMic() {
-      isRecording = true;
-      processedResults = 0;
+    function startRecording() {
       document.getElementById('transcript').value = '';
       document.getElementById('result').innerHTML = '';
       hideMatch();
-      var btn = document.getElementById('mic-btn');
-      btn.classList.add('recording');
-      btn.innerHTML = '&#9724;';
-      setStatus('Listening... Tap to stop.', 'processing');
+      setStatus('', '');
 
-      try {
-        recognition.start();
-      } catch(e) {
-        setStatus('Could not start mic: ' + e.message, 'error');
-        stopMic();
-        return;
-      }
+      navigator.mediaDevices.getUserMedia({ audio: true })
+        .then(function(stream) {
+          isRecording = true;
+          audioChunks = [];
+          secondsElapsed = 0;
 
-      // Auto-stop after 30 seconds
-      recordingTimeout = setTimeout(function() {
-        if (isRecording) {
-          try { recognition.stop(); } catch(e) {}
-          stopMic();
-        }
-      }, 30000);
+          mediaRecorder = new MediaRecorder(stream, { mimeType: getSupportedMimeType() });
+
+          mediaRecorder.ondataavailable = function(event) {
+            if (event.data.size > 0) {
+              audioChunks.push(event.data);
+            }
+          };
+
+          mediaRecorder.onstop = function() {
+            // Stop all tracks to release mic
+            stream.getTracks().forEach(function(track) { track.stop(); });
+            processAudio();
+          };
+
+          mediaRecorder.start();
+
+          var btn = document.getElementById('mic-btn');
+          btn.classList.add('recording');
+          btn.innerHTML = '&#9724;';
+          updateTimer();
+          timerInterval = setInterval(function() {
+            secondsElapsed++;
+            updateTimer();
+            if (secondsElapsed >= MAX_SECONDS) {
+              stopRecording();
+            }
+          }, 1000);
+        })
+        .catch(function(err) {
+          setStatus('Microphone access denied. Please allow microphone.', 'error');
+        });
     }
 
-    function stopMic() {
+    function stopRecording() {
+      if (!isRecording) return;
       isRecording = false;
-      if (recordingTimeout) { clearTimeout(recordingTimeout); recordingTimeout = null; }
+
+      if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+
       var btn = document.getElementById('mic-btn');
       btn.classList.remove('recording');
       btn.innerHTML = '&#127908;';
 
-      var text = document.getElementById('transcript').value.trim();
-      if (text) {
-        setStatus('Review the text, then tap Log Food.', 'success');
-        document.getElementById('submit-btn').disabled = false;
-      } else {
-        setStatus('', '');
+      if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+        mediaRecorder.stop();
       }
+
+      document.getElementById('timer').textContent = 'Processing audio...';
+    }
+
+    function updateTimer() {
+      var remaining = MAX_SECONDS - secondsElapsed;
+      document.getElementById('timer').textContent = 'Recording... ' + remaining + 's remaining';
+    }
+
+    function getSupportedMimeType() {
+      var types = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg'];
+      for (var i = 0; i < types.length; i++) {
+        if (MediaRecorder.isTypeSupported(types[i])) return types[i];
+      }
+      return '';
+    }
+
+    // ---- Send Audio to Backend for Whisper Transcription ----
+    function processAudio() {
+      if (audioChunks.length === 0) {
+        setStatus('No audio recorded.', 'error');
+        document.getElementById('timer').textContent = 'Tap to start recording (up to 30 sec)';
+        return;
+      }
+
+      setStatus('<span class="spinner"></span> Transcribing audio...', 'processing');
+
+      var audioBlob = new Blob(audioChunks, { type: getSupportedMimeType() || 'audio/webm' });
+
+      // Convert blob to base64 and send to Apps Script
+      var reader = new FileReader();
+      reader.onloadend = function() {
+        var base64Audio = reader.result.split(',')[1]; // Remove data:audio/... prefix
+        var mimeType = audioBlob.type || 'audio/webm';
+
+        fetch(GAS_URL + '?action=transcribe', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: 'audio=' + encodeURIComponent(base64Audio) + '&mimeType=' + encodeURIComponent(mimeType)
+        })
+        .then(function(r) { return r.text(); })
+        .then(function(data) {
+          try {
+            var result = JSON.parse(data);
+            if (result.error) {
+              setStatus('Transcription error: ' + result.error, 'error');
+              document.getElementById('timer').textContent = 'Tap to start recording (up to 30 sec)';
+              return;
+            }
+            var transcript = result.transcript || '';
+            document.getElementById('transcript').value = transcript;
+            document.getElementById('submit-btn').disabled = !transcript;
+            document.getElementById('timer').textContent = 'Tap to start recording (up to 30 sec)';
+            setStatus('Review the text, edit if needed, then tap Log Food.', 'success');
+            checkKnownFoodMatch(transcript);
+          } catch(e) {
+            setStatus('Error processing response.', 'error');
+            document.getElementById('timer').textContent = 'Tap to start recording (up to 30 sec)';
+          }
+        })
+        .catch(function(err) {
+          setStatus('Network error: ' + err.message, 'error');
+          document.getElementById('timer').textContent = 'Tap to start recording (up to 30 sec)';
+        });
+      };
+      reader.readAsDataURL(audioBlob);
     }
 
     // ---- Known Food Matching ----
@@ -301,27 +315,17 @@
     function checkKnownFoodMatch(text) {
       if (!knownFoods || knownFoods.length === 0) return;
       var query = text.toLowerCase().trim();
-
-      // Find best match — exact or close substring match
       var bestMatch = null;
       var bestScore = 0;
 
       knownFoods.forEach(function(food) {
         var name = food.name.toLowerCase();
-        // Exact match
-        if (name === query || query === name) {
-          bestMatch = food;
-          bestScore = 100;
-          return;
-        }
-        // Check if query contains the food name or vice versa
+        if (name === query) { bestMatch = food; bestScore = 100; return; }
         if (query.indexOf(name) !== -1 && name.length > bestScore) {
-          bestMatch = food;
-          bestScore = name.length;
+          bestMatch = food; bestScore = name.length;
         }
         if (name.indexOf(query) !== -1 && query.length > 5 && query.length > bestScore) {
-          bestMatch = food;
-          bestScore = query.length;
+          bestMatch = food; bestScore = query.length;
         }
       });
 
@@ -342,12 +346,10 @@
 
     function useMatch() {
       if (!currentMatch) return;
-
       document.getElementById('submit-btn').disabled = true;
       hideMatch();
       setStatus('<span class="spinner"></span> Logging from saved data...', 'processing');
 
-      // Use the known food directly — no Claude API call
       var deviceType = /Mobi|Android/i.test(navigator.userAgent) ? 'mobile' : 'desktop';
       var url = GAS_URL + '?action=quicklog'
         + '&name=' + encodeURIComponent(currentMatch.name)
@@ -362,12 +364,9 @@
       fetch(url, { redirect: 'follow', mode: 'cors' })
         .then(function(r) { return r.text(); })
         .then(function(data) {
-          setStatus('Logged: ' + currentMatch.name + ' (from saved data — $0 cost)', 'success');
-          try {
-            var result = JSON.parse(data);
-            showResult(result);
-          } catch(e) {}
-          resetInput();
+          setStatus('Logged: ' + currentMatch.name + ' (from saved data)', 'success');
+          try { showResult(JSON.parse(data)); } catch(e) {}
+          setTimeout(resetInput, 3000);
         })
         .catch(function(err) {
           window.open(url, '_blank');
@@ -376,18 +375,14 @@
         });
     }
 
-    // ---- Submit Voice (Claude parsing) ----
+    // ---- Submit (Claude parsing) ----
     function submitVoice() {
       var text = document.getElementById('transcript').value.trim();
       if (!text) return;
 
       document.getElementById('submit-btn').disabled = true;
-      if (isRecording) {
-        try { recognition.stop(); } catch(e) {}
-        stopMic();
-      }
       hideMatch();
-      setStatus('<span class="spinner"></span> Sending to AI...', 'processing');
+      setStatus('<span class="spinner"></span> Analyzing with AI...', 'processing');
 
       var deviceType = /Mobi|Android/i.test(navigator.userAgent) ? 'mobile' : 'desktop';
       var url = GAS_URL + '?action=voice&text=' + encodeURIComponent(text) + '&meal=' + encodeURIComponent(currentMeal) + '&device=' + deviceType;
@@ -419,7 +414,6 @@
 
     function resetInput() {
       document.getElementById('transcript').value = '';
-      document.getElementById('transcript').setAttribute('data-final', '');
       document.getElementById('submit-btn').disabled = true;
       hideMatch();
     }
