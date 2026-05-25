@@ -198,13 +198,23 @@
       recognition.continuous = true;
       recognition.interimResults = false;
 
+      var processedResults = 0;
+
       recognition.onresult = function(event) {
-        // Only final results arrive — just append the latest segment
-        var newSegment = event.results[event.results.length - 1][0].transcript;
-        var existing = document.getElementById('transcript').value.trim();
-        var fullText = existing ? existing + ' ' + newSegment.trim() : newSegment.trim();
-        document.getElementById('transcript').value = fullText;
-        document.getElementById('submit-btn').disabled = false;
+        // Only process NEW final results (skip already processed ones)
+        var newText = '';
+        for (var i = processedResults; i < event.results.length; i++) {
+          if (event.results[i].isFinal) {
+            newText += event.results[i][0].transcript + ' ';
+            processedResults = i + 1;
+          }
+        }
+        if (newText) {
+          var existing = document.getElementById('transcript').value.trim();
+          var fullText = existing ? existing + ' ' + newText.trim() : newText.trim();
+          document.getElementById('transcript').value = fullText;
+          document.getElementById('submit-btn').disabled = false;
+        }
       };
 
       recognition.onerror = function(event) {
@@ -235,6 +245,7 @@
 
     function startMic() {
       isRecording = true;
+      processedResults = 0;
       document.getElementById('transcript').value = '';
       document.getElementById('result').innerHTML = '';
       hideMatch();
