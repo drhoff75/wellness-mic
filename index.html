@@ -314,22 +314,36 @@
 
     function checkKnownFoodMatch(text) {
       if (!knownFoods || knownFoods.length === 0) return;
-      var query = text.toLowerCase().trim();
+      var query = text.toLowerCase().trim().replace(/[.,!?]/g, '');
       var bestMatch = null;
       var bestScore = 0;
 
       knownFoods.forEach(function(food) {
-        var name = food.name.toLowerCase();
-        if (name === query) { bestMatch = food; bestScore = 100; return; }
-        if (query.indexOf(name) !== -1 && name.length > bestScore) {
-          bestMatch = food; bestScore = name.length;
+        var name = food.name.toLowerCase().replace(/[.,!?]/g, '');
+        var score = 0;
+
+        // Exact match — highest priority
+        if (name === query) {
+          score = 1000;
         }
-        if (name.indexOf(query) !== -1 && query.length > 5 && query.length > bestScore) {
-          bestMatch = food; bestScore = query.length;
+        // Query contains the food name — score by how much of the query it covers
+        else if (query.indexOf(name) !== -1) {
+          score = Math.round((name.length / query.length) * 100);
+        }
+        // Food name contains the query
+        else if (name.indexOf(query) !== -1 && query.length > 5) {
+          score = Math.round((query.length / name.length) * 100);
+        }
+
+        // Prefer longer/more specific matches (combo entries over single ingredients)
+        if (score > bestScore) {
+          bestMatch = food;
+          bestScore = score;
         }
       });
 
-      if (bestMatch && bestScore >= 5) {
+      // Only show if match covers at least 50% of the query
+      if (bestMatch && bestScore >= 50) {
         currentMatch = bestMatch;
         document.getElementById('match-name').textContent = bestMatch.name;
         document.getElementById('match-cal').textContent = bestMatch.calories + ' kcal';
