@@ -28,115 +28,86 @@
     }
     h1 { font-size: 20px; margin-bottom: 16px; color: #1a1a2e; }
 
-    .meal-selector {
-      display: flex;
-      gap: 4px;
-      margin-bottom: 16px;
-    }
+    .meal-selector { display: flex; gap: 4px; margin-bottom: 16px; }
     .meal-btn {
-      flex: 1;
-      padding: 8px 2px;
-      border: 2px solid #e8ecf1;
-      border-radius: 8px;
-      background: white;
-      font-size: 12px;
-      font-weight: 500;
-      cursor: pointer;
-      color: #555;
+      flex: 1; padding: 8px 2px; border: 2px solid #e8ecf1; border-radius: 8px;
+      background: white; font-size: 12px; font-weight: 500; cursor: pointer; color: #555;
     }
     .meal-btn.active { background: #3b82f6; border-color: #3b82f6; color: white; }
 
     .mic-btn {
-      width: 80px;
-      height: 80px;
-      border-radius: 50%;
-      border: none;
-      background: #3b82f6;
-      color: white;
-      font-size: 32px;
-      cursor: pointer;
-      margin: 16px auto;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      transition: all 0.2s;
+      width: 80px; height: 80px; border-radius: 50%; border: none; background: #3b82f6;
+      color: white; font-size: 32px; cursor: pointer; margin: 16px auto;
+      display: flex; align-items: center; justify-content: center; transition: all 0.2s;
     }
-    .mic-btn.recording {
-      background: #ef4444;
-      animation: pulse 1.5s infinite;
-    }
-    @keyframes pulse {
-      0%, 100% { transform: scale(1); }
-      50% { transform: scale(1.1); }
-    }
+    .mic-btn.recording { background: #ef4444; animation: pulse 1.5s infinite; }
+    @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.1); } }
 
-    .transcript {
+    .transcript-area {
+      margin: 12px 0;
+      position: relative;
+    }
+    .transcript-input {
+      width: 100%;
       min-height: 48px;
       padding: 12px;
       background: #f8f9fb;
+      border: 2px solid #e8ecf1;
       border-radius: 10px;
-      margin: 12px 0;
       font-size: 16px;
       color: #333;
       text-align: left;
+      resize: vertical;
+      font-family: inherit;
+      outline: none;
     }
-    .transcript.empty { color: #aaa; text-align: center; }
+    .transcript-input:focus { border-color: #3b82f6; }
+    .transcript-input::placeholder { color: #aaa; text-align: center; }
 
-    .status {
-      font-size: 13px;
-      min-height: 20px;
+    .match-banner {
+      display: none;
+      padding: 8px 12px;
+      background: #f0fdf4;
+      border: 2px solid #22c55e;
+      border-radius: 8px;
       margin: 8px 0;
+      text-align: left;
+      font-size: 14px;
+      cursor: pointer;
     }
+    .match-banner .match-name { font-weight: 600; }
+    .match-banner .match-cal { color: #22c55e; font-weight: 600; float: right; }
+    .match-banner .match-hint { font-size: 11px; color: #888; display: block; margin-top: 2px; }
+
+    .status { font-size: 13px; min-height: 20px; margin: 8px 0; }
     .status.processing { color: #3b82f6; }
     .status.error { color: #ef4444; }
     .status.success { color: #22c55e; }
 
     .btn-submit {
-      width: 100%;
-      padding: 14px;
-      border: none;
-      border-radius: 10px;
-      background: #22c55e;
-      color: white;
-      font-size: 16px;
-      font-weight: 600;
-      cursor: pointer;
-      margin-top: 8px;
+      width: 100%; padding: 14px; border: none; border-radius: 10px;
+      background: #22c55e; color: white; font-size: 16px; font-weight: 600;
+      cursor: pointer; margin-top: 8px;
     }
     .btn-submit:hover { background: #16a34a; }
     .btn-submit:disabled { background: #ccc; cursor: not-allowed; }
 
     .btn-back {
-      display: inline-block;
-      margin-top: 16px;
-      color: #3b82f6;
-      text-decoration: none;
-      font-size: 14px;
+      display: inline-block; margin-top: 16px; color: #3b82f6;
+      text-decoration: none; font-size: 14px;
     }
 
     .spinner {
-      display: inline-block;
-      width: 16px;
-      height: 16px;
-      border: 2px solid #e8ecf1;
-      border-top-color: #3b82f6;
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
+      display: inline-block; width: 16px; height: 16px;
+      border: 2px solid #e8ecf1; border-top-color: #3b82f6;
+      border-radius: 50%; animation: spin 0.8s linear infinite;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
 
-    .result-items {
-      text-align: left;
-      margin-top: 12px;
-    }
+    .result-items { text-align: left; margin-top: 12px; }
     .result-item {
-      padding: 8px 10px;
-      background: #f0fdf4;
-      border-radius: 8px;
-      margin-bottom: 4px;
-      display: flex;
-      justify-content: space-between;
-      font-size: 14px;
+      padding: 8px 10px; background: #f0fdf4; border-radius: 8px;
+      margin-bottom: 4px; display: flex; justify-content: space-between; font-size: 14px;
     }
     .result-item .cal { color: #22c55e; font-weight: 600; }
   </style>
@@ -155,7 +126,16 @@
     <button class="mic-btn" id="mic-btn" onclick="toggleMic()">&#127908;</button>
     <div style="font-size:12px;color:#888;">Tap to start / stop</div>
 
-    <div class="transcript empty" id="transcript">Tap the mic and speak...</div>
+    <div class="transcript-area">
+      <textarea class="transcript-input" id="transcript" placeholder="Tap the mic and speak, or type here..." rows="2" oninput="onTranscriptChange()"></textarea>
+    </div>
+
+    <!-- Known Food match banner -->
+    <div class="match-banner" id="match-banner" onclick="useMatch()">
+      <span class="match-name" id="match-name"></span>
+      <span class="match-cal" id="match-cal"></span>
+      <span class="match-hint">Tap to use this (no API cost)</span>
+    </div>
 
     <div class="status" id="status"></div>
 
@@ -174,7 +154,8 @@
     var isRecording = false;
     var recognition = null;
     var recordingTimeout = null;
-    var fullTranscript = '';
+    var knownFoods = [];
+    var currentMatch = null;
 
     // Auto-select meal based on time
     (function() {
@@ -193,13 +174,23 @@
       });
     })();
 
+    // Load Known Foods on page load for autocomplete matching
+    (function() {
+      fetch(GAS_URL + '?action=knownfoods', { redirect: 'follow', mode: 'cors' })
+        .then(function(r) { return r.text(); })
+        .then(function(data) {
+          try { knownFoods = JSON.parse(data); } catch(e) { knownFoods = []; }
+        })
+        .catch(function() { knownFoods = []; });
+    })();
+
     function selectMeal(btn, meal) {
       document.querySelectorAll('.meal-btn').forEach(function(b) { b.classList.remove('active'); });
       btn.classList.add('active');
       currentMeal = meal;
     }
 
-    // Init Speech Recognition
+    // ---- Speech Recognition ----
     var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (SpeechRecognition) {
       recognition = new SpeechRecognition();
@@ -207,23 +198,23 @@
       recognition.continuous = true;
       recognition.interimResults = true;
 
+      // Track finalized segments to avoid duplication
+      var finalizedSegments = [];
+
       recognition.onresult = function(event) {
-        var interimTranscript = '';
-        var finalTranscript = '';
-        for (var i = event.resultIndex; i < event.results.length; i++) {
+        // Rebuild transcript from all results
+        var finalText = '';
+        var interimText = '';
+        for (var i = 0; i < event.results.length; i++) {
           if (event.results[i].isFinal) {
-            finalTranscript += event.results[i][0].transcript + ' ';
+            finalText += event.results[i][0].transcript + ' ';
           } else {
-            interimTranscript += event.results[i][0].transcript;
+            interimText += event.results[i][0].transcript;
           }
         }
-        if (finalTranscript) {
-          fullTranscript += finalTranscript;
-        }
-        var el = document.getElementById('transcript');
-        el.textContent = fullTranscript + interimTranscript;
-        el.classList.remove('empty');
+        document.getElementById('transcript').value = (finalText + interimText).trim();
         document.getElementById('submit-btn').disabled = false;
+        checkKnownFoodMatch((finalText + interimText).trim());
       };
 
       recognition.onerror = function(event) {
@@ -234,10 +225,12 @@
       };
 
       recognition.onend = function() {
-        // In continuous mode, restart if still recording (browser may stop after silence)
+        // Don't restart — let it end when user pauses
         if (isRecording) {
-          try { recognition.start(); } catch(e) { stopMic(); }
+          stopMic();
         }
+        var text = document.getElementById('transcript').value.trim();
+        if (text) checkKnownFoodMatch(text);
       };
     } else {
       document.getElementById('mic-btn').style.display = 'none';
@@ -255,10 +248,9 @@
 
     function startMic() {
       isRecording = true;
-      fullTranscript = '';
-      document.getElementById('transcript').textContent = '';
-      document.getElementById('transcript').classList.add('empty');
+      document.getElementById('transcript').value = '';
       document.getElementById('result').innerHTML = '';
+      hideMatch();
       var btn = document.getElementById('mic-btn');
       btn.classList.add('recording');
       btn.innerHTML = '&#9724;';
@@ -272,12 +264,13 @@
         return;
       }
 
+      // Auto-stop after 30 seconds
       recordingTimeout = setTimeout(function() {
         if (isRecording) {
           try { recognition.stop(); } catch(e) {}
           stopMic();
         }
-      }, 60000);
+      }, 30000);
     }
 
     function stopMic() {
@@ -287,27 +280,117 @@
       btn.classList.remove('recording');
       btn.innerHTML = '&#127908;';
 
-      var text = document.getElementById('transcript').textContent.trim();
-      if (text && text !== 'Tap the mic and speak...') {
-        setStatus('Ready to log.', 'success');
+      var text = document.getElementById('transcript').value.trim();
+      if (text) {
+        setStatus('Review the text, then tap Log Food.', 'success');
+        document.getElementById('submit-btn').disabled = false;
       } else {
         setStatus('', '');
       }
     }
 
-    function submitVoice() {
-      var text = document.getElementById('transcript').textContent.trim();
-      if (!text || text === 'Tap the mic and speak...') return;
+    // ---- Known Food Matching ----
+    function onTranscriptChange() {
+      var text = document.getElementById('transcript').value.trim();
+      document.getElementById('submit-btn').disabled = !text;
+      if (text.length >= 3) {
+        checkKnownFoodMatch(text);
+      } else {
+        hideMatch();
+      }
+    }
+
+    function checkKnownFoodMatch(text) {
+      if (!knownFoods || knownFoods.length === 0) return;
+      var query = text.toLowerCase().trim();
+
+      // Find best match — exact or close substring match
+      var bestMatch = null;
+      var bestScore = 0;
+
+      knownFoods.forEach(function(food) {
+        var name = food.name.toLowerCase();
+        // Exact match
+        if (name === query || query === name) {
+          bestMatch = food;
+          bestScore = 100;
+          return;
+        }
+        // Check if query contains the food name or vice versa
+        if (query.indexOf(name) !== -1 && name.length > bestScore) {
+          bestMatch = food;
+          bestScore = name.length;
+        }
+        if (name.indexOf(query) !== -1 && query.length > 5 && query.length > bestScore) {
+          bestMatch = food;
+          bestScore = query.length;
+        }
+      });
+
+      if (bestMatch && bestScore >= 5) {
+        currentMatch = bestMatch;
+        document.getElementById('match-name').textContent = bestMatch.name;
+        document.getElementById('match-cal').textContent = bestMatch.calories + ' kcal';
+        document.getElementById('match-banner').style.display = 'block';
+      } else {
+        hideMatch();
+      }
+    }
+
+    function hideMatch() {
+      currentMatch = null;
+      document.getElementById('match-banner').style.display = 'none';
+    }
+
+    function useMatch() {
+      if (!currentMatch) return;
 
       document.getElementById('submit-btn').disabled = true;
-      // Stop mic if still recording
+      hideMatch();
+      setStatus('<span class="spinner"></span> Logging from saved data...', 'processing');
+
+      // Use the known food directly — no Claude API call
+      var deviceType = /Mobi|Android/i.test(navigator.userAgent) ? 'mobile' : 'desktop';
+      var url = GAS_URL + '?action=quicklog'
+        + '&name=' + encodeURIComponent(currentMatch.name)
+        + '&quantity=' + encodeURIComponent(currentMatch.quantity)
+        + '&calories=' + encodeURIComponent(currentMatch.calories)
+        + '&protein_g=' + encodeURIComponent(currentMatch.protein_g)
+        + '&carbs_g=' + encodeURIComponent(currentMatch.carbs_g)
+        + '&fat_g=' + encodeURIComponent(currentMatch.fat_g)
+        + '&meal=' + encodeURIComponent(currentMeal)
+        + '&device=' + deviceType;
+
+      fetch(url, { redirect: 'follow', mode: 'cors' })
+        .then(function(r) { return r.text(); })
+        .then(function(data) {
+          setStatus('Logged: ' + currentMatch.name + ' (from saved data — $0 cost)', 'success');
+          try {
+            var result = JSON.parse(data);
+            showResult(result);
+          } catch(e) {}
+          resetInput();
+        })
+        .catch(function(err) {
+          window.open(url, '_blank');
+          setStatus('Logging... Check tracker in a moment.', 'processing');
+          setTimeout(resetInput, 3000);
+        });
+    }
+
+    // ---- Submit Voice (Claude parsing) ----
+    function submitVoice() {
+      var text = document.getElementById('transcript').value.trim();
+      if (!text) return;
+
+      document.getElementById('submit-btn').disabled = true;
       if (isRecording) {
         try { recognition.stop(); } catch(e) {}
         stopMic();
       }
+      hideMatch();
       setStatus('<span class="spinner"></span> Sending to AI...', 'processing');
 
-      // Call the Apps Script backend using JSONP-style redirect
       var deviceType = /Mobi|Android/i.test(navigator.userAgent) ? 'mobile' : 'desktop';
       var url = GAS_URL + '?action=voice&text=' + encodeURIComponent(text) + '&meal=' + encodeURIComponent(currentMeal) + '&device=' + deviceType;
 
@@ -323,35 +406,30 @@
             }
             setStatus('Logged successfully!', 'success');
             showResult(result);
-            setTimeout(function() {
-              document.getElementById('transcript').textContent = 'Tap the mic and speak...';
-              document.getElementById('transcript').classList.add('empty');
-              document.getElementById('submit-btn').disabled = true;
-            }, 3000);
+            setTimeout(resetInput, 3000);
           } catch(e) {
             setStatus('Logged! Return to tracker to see details.', 'success');
+            setTimeout(resetInput, 3000);
           }
         })
         .catch(function(err) {
-          // CORS fallback: open in new tab to trigger the request
           window.open(url, '_blank');
-          setStatus('Logging... Check your tracker in a moment.', 'processing');
-          setTimeout(function() {
-            setStatus('Food should be logged. Tap Back to Tracker to verify.', 'success');
-            document.getElementById('transcript').textContent = 'Tap the mic and speak...';
-            document.getElementById('transcript').classList.add('empty');
-            document.getElementById('submit-btn').disabled = true;
-          }, 5000);
+          setStatus('Logging... Check tracker in a moment.', 'processing');
+          setTimeout(resetInput, 5000);
         });
+    }
+
+    function resetInput() {
+      document.getElementById('transcript').value = '';
+      document.getElementById('submit-btn').disabled = true;
+      hideMatch();
     }
 
     function showResult(summary) {
       var html = '<div class="result-items">';
       if (summary.meals && summary.meals.length > 0) {
-        // Show only the last logged item (most recent)
         var lastItem = summary.meals[summary.meals.length - 1];
         html += '<div class="result-item"><span><strong>' + lastItem.name + '</strong></span><span class="cal">' + lastItem.calories + ' kcal</span></div>';
-        // Show sub-items if grouped
         if (lastItem.items && lastItem.items.length > 1) {
           lastItem.items.forEach(function(sub) {
             html += '<div class="result-item" style="font-size:12px;background:#f8faf8;"><span style="padding-left:8px;">' + sub.name + ' (' + sub.quantity + ')</span><span class="cal" style="font-size:12px;">' + sub.calories + ' kcal</span></div>';
