@@ -155,9 +155,18 @@
       fetch(GAS_URL + '?action=knownfoods', { redirect: 'follow', mode: 'cors' })
         .then(function(r) { return r.text(); })
         .then(function(data) {
-          try { knownFoods = JSON.parse(data); } catch(e) { knownFoods = []; }
+          try {
+            knownFoods = JSON.parse(data);
+            console.log('Known Foods loaded: ' + knownFoods.length + ' items');
+          } catch(e) {
+            knownFoods = [];
+            console.log('Failed to parse Known Foods: ' + data.substring(0, 100));
+          }
         })
-        .catch(function() { knownFoods = []; });
+        .catch(function(err) {
+          knownFoods = [];
+          console.log('Failed to load Known Foods: ' + err.message);
+        });
     })();
 
     function selectMeal(btn, meal) {
@@ -312,38 +321,70 @@
       }
     }
 
+    function normalize(text) {
+      // Strip all punctuation, extra spaces, articles, and lowercase
+      return text.toLowerCase()
+        .replace(/[.,!?;:'"()\-\/\\]/g, '')
+        .replace(/\b(a|an|the|of|with|and)\b/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+    }
+
     function checkKnownFoodMatch(text) {
-      if (!knownFoods || knownFoods.length === 0) return;
-      var query = text.toLowerCase().trim().replace(/[.,!?]/g, '');
+      if (!knownFoods || knownFoods.length === 0) {
+        hideMatch();
+        return;
+      }
+
+      var query = normalize(text);
+      if (query.length < 3) { hideMatch(); return; }
+
       var bestMatch = null;
       var bestScore = 0;
 
       knownFoods.forEach(function(food) {
-        var name = food.name.toLowerCase().replace(/[.,!?]/g, '');
+        var name = normalize(food.name);
+        if (!name) return;
+
         var score = 0;
 
-        // Exact match — highest priority
+        // Exact match after normalization
         if (name === query) {
           score = 1000;
         }
-        // Query contains the food name — score by how much of the query it covers
+        // Query contains the full food name
         else if (query.indexOf(name) !== -1) {
-          score = Math.round((name.length / query.length) * 100);
+          score = 500 + name.length; // Longer name = better match
         }
-        // Food name contains the query
-        else if (name.indexOf(query) !== -1 && query.length > 5) {
-          score = Math.round((query.length / name.length) * 100);
+        // Food name contains the full query
+        else if (name.indexOf(query) !== -1 && query.length >= 4) {
+          score = 400 + query.length;
+        }
+        // Word overlap — count how many significant words match
+        else {
+          var queryWords = query.split(' ').filter(function(w) { return w.length > 2; });
+          var nameWords = name.split(' ').filter(function(w) { return w.length > 2; });
+          var matchCount = 0;
+          queryWords.forEach(function(qw) {
+            nameWords.forEach(function(nw) {
+              if (qw === nw || qw.indexOf(nw) !== -1 || nw.indexOf(qw) !== -1) matchCount++;
+            });
+          });
+          if (matchCount > 0 && nameWords.length > 0) {
+            var coverage = matchCount / Math.max(queryWords.length, nameWords.length);
+            if (coverage >= 0.5) {
+              score = Math.round(coverage * 300) + name.length; // Prefer longer/combo entries
+            }
+          }
         }
 
-        // Prefer longer/more specific matches (combo entries over single ingredients)
         if (score > bestScore) {
           bestMatch = food;
           bestScore = score;
         }
       });
 
-      // Only show if match covers at least 50% of the query
-      if (bestMatch && bestScore >= 50) {
+      if (bestMatch && bestScore >= 200) {
         currentMatch = bestMatch;
         document.getElementById('match-name').textContent = bestMatch.name;
         document.getElementById('match-cal').textContent = bestMatch.calories + ' kcal';
